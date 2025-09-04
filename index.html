@@ -60,5 +60,22 @@
 
   refresh();
 </script>
+<script type="module">
+  // ... oluşturduğun sb client ve login kodu aynı kalsın
+
+  async function listMenu(){
+    const { data, error } = await sb
+      .from('menu_items')
+      .select('name, price')
+      .limit(20);
+    const pre = document.createElement('pre');
+    pre.style.textAlign='left';
+    pre.textContent = error ? `Hata: ${error.message}` : JSON.stringify(data, null, 2);
+    document.querySelector('.card')?.appendChild(pre);
+  }
+
+  // giriş olunca listele
+  sb.auth.onAuthStateChange((_e, sess)=>{ if(sess) listMenu(); });
+</script>
 </body>
 </html>
