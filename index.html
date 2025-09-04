@@ -18,5 +18,47 @@
     <p>Masa • Sipariş • Mutfak — <b>Yakında</b></p>
     <small>© 2025 Gastronom</small>
   </div>
+  <script type="module">
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+  // 👇 BURAYA KENDİ DEĞERLERİNİ KOY
+  const SUPABASE_URL  = "https://deiycvkmwiaqzgtyoxmm.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlaXljdmttd2lhcXpndHlveG1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTg5MzUsImV4cCI6MjA3MjU5NDkzNX0.7Iic2nacxqj2Flusjd4t2HR-8fUHpkmUcLNJs-Nt37I";
+
+  const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  // Durum göstergesi
+  const box = document.querySelector('.card');
+  const s = document.createElement('div'); s.style.marginTop='12px'; box.appendChild(s);
+
+  async function refresh() {
+    const { data:{ session } } = await sb.auth.getSession();
+    s.textContent = session ? `Girişli: ${session.user.email}` : "Giriş yapılmamış.";
+  }
+
+  // Mini login formu
+  const form = document.createElement('form');
+  form.innerHTML = `
+    <div style="margin:10px 0"><input id="em" type="email" placeholder="E-posta" required style="padding:10px;border-radius:10px"></div>
+    <div style="margin:10px 0"><input id="pw" type="password" placeholder="Şifre" required style="padding:10px;border-radius:10px"></div>
+    <button>Giriş yap</button>
+    <button type="button" id="logout" style="margin-left:8px">Çıkış</button>`;
+  box.appendChild(form);
+
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const email = document.getElementById('em').value.trim();
+    const password = document.getElementById('pw').value;
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    s.textContent = error ? `Hata: ${error.message}` : "Giriş başarılı.";
+    refresh();
+  });
+
+  document.getElementById('logout').addEventListener('click', async ()=>{
+    await sb.auth.signOut(); s.textContent = "Çıkış yapıldı."; refresh();
+  });
+
+  refresh();
+</script>
 </body>
 </html>
