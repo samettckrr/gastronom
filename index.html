@@ -6,12 +6,14 @@
   <title>Gastronom</title>
   <style>
     body{margin:0;font-family:system-ui,Arial;background:#0f172a;color:#e5e7eb;display:grid;place-items:center;height:100dvh}
-    .card{padding:32px;border-radius:16px;background:rgba(255,255,255,.06);border:1px solid rgba(148,163,184,.2);text-align:center;max-width:520px}
+    .card{padding:32px;border-radius:16px;background:rgba(255,255,255,.06);border:1px solid rgba(148,163,184,.2);text-align:center;max-width:560px}
     h1{margin:0 0 8px;font-size:28px}
     p{margin:0 0 16px;opacity:.85}
     small{opacity:.6}
     input,button{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:#e5e7eb}
     form > div{margin:10px 0}
+    .err{margin-top:8px;color:#fca5a5}
+    pre{text-align:left;white-space:pre-wrap;word-break:break-word}
   </style>
 </head>
 <body>
@@ -21,29 +23,39 @@
     <small>© 2025 Gastronom</small>
   </div>
 
-  <script type="module">
-    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-    // ---> KENDİ BİLGİLERİNİ YAPIŞTIR <---
-  const SUPABASE_URL  = "https://deiycvkmwiaqzgtyoxmm.supabase.co";
-  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlaXljdmttd2lhcXpndHlveG1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTg5MzUsImV4cCI6MjA3MjU5NDkzNX0.7Iic2nacxqj2Flusjd4t2HR-8fUHpkmUcLNJs-Nt37I";
-
+  <!-- Supabase (global) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // 1) Supabase client
+    const { createClient } = window.supabase;
+    const SUPABASE_URL  = "https://deiycvkmwiaqzgtyoxmm.supabase.co";  // <-- değiştir
+    const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlaXljdmttd2lhcXpndHlveG1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTg5MzUsImV4cCI6MjA3MjU5NDkzNX0.7Iic2nacxqj2Flusjd4t2HR-8fUHpkmUcLNJs-Nt37I";                         // <-- değiştir
     const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
+    // 2) UI elemanları
     const card = document.querySelector('.card');
-
-    // Durum yazısı
     const statusEl = document.createElement('div');
     statusEl.style.marginTop = '12px';
     card.appendChild(statusEl);
 
+    const errEl = document.createElement('div');
+    errEl.className = 'err';
+    card.appendChild(errEl);
+
+    function setStatus(t){ statusEl.textContent = t; }
+    function setErr(t){ errEl.textContent = t || ""; }
+
+    // 3) Oturum durumu
     async function refreshSession(){
-      const { data:{ session } } = await sb.auth.getSession();
-      statusEl.textContent = session ? `Girişli: ${session.user.email}` : "Giriş yapılmamış.";
-      return !!session;
+      try{
+        const { data:{ session }, error } = await sb.auth.getSession();
+        if(error) throw error;
+        setStatus(session ? `Girişli: ${session.user.email}` : "Giriş yapılmamış.");
+        return !!session;
+      }catch(e){ setErr("Session hata: " + e.message); return false; }
     }
 
-    // Login formu
+    // 4) Login formu
     const form = document.createElement('form');
     form.innerHTML = `
       <div><input id="em" type="email" placeholder="E-posta" required></div>
@@ -54,38 +66,49 @@
     card.appendChild(form);
 
     form.addEventListener('submit', async (e)=>{
-      e.preventDefault();
+      e.preventDefault(); setErr("");
       const email = document.getElementById('em').value.trim();
       const password = document.getElementById('pw').value;
-      const { error } = await sb.auth.signInWithPassword({ email, password });
-      statusEl.textContent = error ? `Hata: ${error.message}` : "Giriş başarılı.";
-      if (!error) listMenu();
+      try{
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if(error) throw error;
+        setStatus("Giriş başarılı.");
+        await refreshSession();
+        await listMenu();
+      }catch(e){
+        setErr("Giriş hata: " + e.message);
+      }
     });
 
     document.getElementById('logout').addEventListener('click', async ()=>{
+      setErr("");
       await sb.auth.signOut();
-      statusEl.textContent = "Çıkış yapıldı.";
+      setStatus("Çıkış yapıldı.");
       clearMenu();
     });
 
-    // Menü listeleme
+    // 5) Menü listeleme (test)
     const menuBox = document.createElement('pre');
-    menuBox.style.textAlign = 'left';
-    function clearMenu(){ menuBox.textContent = ""; }
+    function clearMenu(){ menuBox.textContent = ""; if(menuBox.parentNode) menuBox.parentNode.removeChild(menuBox); }
+
     async function listMenu(){
-      const { data, error } = await sb.from('menu_items').select('name, price').limit(20);
-      menuBox.textContent = error ? `Hata: ${error.message}` : JSON.stringify(data, null, 2);
-      if (!menuBox.isConnected) card.appendChild(menuBox);
+      try{
+        const { data, error } = await sb.from('menu_items').select('name, price').limit(20);
+        if(error) throw error;
+        menuBox.textContent = JSON.stringify(data, null, 2);
+        if(!menuBox.isConnected) card.appendChild(menuBox);
+      }catch(e){
+        setErr("Menü hata: " + e.message);
+      }
     }
 
-    // Oturum değişince de çalışsın
-    sb.auth.onAuthStateChange(async (_event, session)=>{
-      if (session) { await listMenu(); }
-      else { clearMenu(); }
+    // 6) Oturum değişimini dinle
+    sb.auth.onAuthStateChange(async (_ev, session)=>{
+      if (session) { await listMenu(); } else { clearMenu(); }
     });
 
-    // İlk durum
-    if (await refreshSession()) { await listMenu(); }
+    // 7) İlk durum
+    (async ()=>{ if (await refreshSession()) await listMenu(); })();
   </script>
 </body>
 </html>
