@@ -6,10 +6,12 @@
   <title>Gastronom</title>
   <style>
     body{margin:0;font-family:system-ui,Arial;background:#0f172a;color:#e5e7eb;display:grid;place-items:center;height:100dvh}
-    .card{padding:32px;border-radius:16px;background:rgba(255,255,255,.06);border:1px solid rgba(148,163,184,.2);text-align:center}
+    .card{padding:32px;border-radius:16px;background:rgba(255,255,255,.06);border:1px solid rgba(148,163,184,.2);text-align:center;max-width:520px}
     h1{margin:0 0 8px;font-size:28px}
     p{margin:0 0 16px;opacity:.85}
     small{opacity:.6}
+    input,button{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:#e5e7eb}
+    form > div{margin:10px 0}
   </style>
 </head>
 <body>
@@ -18,64 +20,72 @@
     <p>Masa • Sipariş • Mutfak — <b>Yakında</b></p>
     <small>© 2025 Gastronom</small>
   </div>
-  <script type="module">
-  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-  // 👇 BURAYA KENDİ DEĞERLERİNİ KOY
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+    // ---> KENDİ BİLGİLERİNİ YAPIŞTIR <---
   const SUPABASE_URL  = "https://deiycvkmwiaqzgtyoxmm.supabase.co";
   const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlaXljdmttd2lhcXpndHlveG1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMTg5MzUsImV4cCI6MjA3MjU5NDkzNX0.7Iic2nacxqj2Flusjd4t2HR-8fUHpkmUcLNJs-Nt37I";
 
-  const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-  // Durum göstergesi
-  const box = document.querySelector('.card');
-  const s = document.createElement('div'); s.style.marginTop='12px'; box.appendChild(s);
+    const card = document.querySelector('.card');
 
-  async function refresh() {
-    const { data:{ session } } = await sb.auth.getSession();
-    s.textContent = session ? `Girişli: ${session.user.email}` : "Giriş yapılmamış.";
-  }
+    // Durum yazısı
+    const statusEl = document.createElement('div');
+    statusEl.style.marginTop = '12px';
+    card.appendChild(statusEl);
 
-  // Mini login formu
-  const form = document.createElement('form');
-  form.innerHTML = `
-    <div style="margin:10px 0"><input id="em" type="email" placeholder="E-posta" required style="padding:10px;border-radius:10px"></div>
-    <div style="margin:10px 0"><input id="pw" type="password" placeholder="Şifre" required style="padding:10px;border-radius:10px"></div>
-    <button>Giriş yap</button>
-    <button type="button" id="logout" style="margin-left:8px">Çıkış</button>`;
-  box.appendChild(form);
+    async function refreshSession(){
+      const { data:{ session } } = await sb.auth.getSession();
+      statusEl.textContent = session ? `Girişli: ${session.user.email}` : "Giriş yapılmamış.";
+      return !!session;
+    }
 
-  form.addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const email = document.getElementById('em').value.trim();
-    const password = document.getElementById('pw').value;
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    s.textContent = error ? `Hata: ${error.message}` : "Giriş başarılı.";
-    refresh();
-  });
+    // Login formu
+    const form = document.createElement('form');
+    form.innerHTML = `
+      <div><input id="em" type="email" placeholder="E-posta" required></div>
+      <div><input id="pw" type="password" placeholder="Şifre" required></div>
+      <button>Giriş yap</button>
+      <button type="button" id="logout" style="margin-left:8px">Çıkış</button>
+    `;
+    card.appendChild(form);
 
-  document.getElementById('logout').addEventListener('click', async ()=>{
-    await sb.auth.signOut(); s.textContent = "Çıkış yapıldı."; refresh();
-  });
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const email = document.getElementById('em').value.trim();
+      const password = document.getElementById('pw').value;
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      statusEl.textContent = error ? `Hata: ${error.message}` : "Giriş başarılı.";
+      if (!error) listMenu();
+    });
 
-  refresh();
-</script>
-<script type="module">
-  // ... oluşturduğun sb client ve login kodu aynı kalsın
+    document.getElementById('logout').addEventListener('click', async ()=>{
+      await sb.auth.signOut();
+      statusEl.textContent = "Çıkış yapıldı.";
+      clearMenu();
+    });
 
-  async function listMenu(){
-    const { data, error } = await sb
-      .from('menu_items')
-      .select('name, price')
-      .limit(20);
-    const pre = document.createElement('pre');
-    pre.style.textAlign='left';
-    pre.textContent = error ? `Hata: ${error.message}` : JSON.stringify(data, null, 2);
-    document.querySelector('.card')?.appendChild(pre);
-  }
+    // Menü listeleme
+    const menuBox = document.createElement('pre');
+    menuBox.style.textAlign = 'left';
+    function clearMenu(){ menuBox.textContent = ""; }
+    async function listMenu(){
+      const { data, error } = await sb.from('menu_items').select('name, price').limit(20);
+      menuBox.textContent = error ? `Hata: ${error.message}` : JSON.stringify(data, null, 2);
+      if (!menuBox.isConnected) card.appendChild(menuBox);
+    }
 
-  // giriş olunca listele
-  sb.auth.onAuthStateChange((_e, sess)=>{ if(sess) listMenu(); });
-</script>
+    // Oturum değişince de çalışsın
+    sb.auth.onAuthStateChange(async (_event, session)=>{
+      if (session) { await listMenu(); }
+      else { clearMenu(); }
+    });
+
+    // İlk durum
+    if (await refreshSession()) { await listMenu(); }
+  </script>
 </body>
 </html>
